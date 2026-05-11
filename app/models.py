@@ -33,12 +33,6 @@ class LeadAnalysisResult(BaseModel):
     is_traffic_issue: bool
     is_sales_issue: bool
 
-    @field_validator("manager_actions")
-    @classmethod
-    def check_actions_not_empty_if_data_exists(cls, v):
-        if not v:
-            raise ValueError("manager_actions cannot be empty when CRM returned data")
-        return v
 
 
 def generate_task_id() -> str:
