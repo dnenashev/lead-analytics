@@ -36,6 +36,8 @@ async def lifespan(app: FastAPI):
         "PAPERCLIP_SERVICE_TOKEN": bool(os.getenv("PAPERCLIP_SERVICE_TOKEN")),
         "BITRIX24_WEBHOOK_URL": bool(os.getenv("BITRIX24_WEBHOOK_URL")),
         "AMOCRM_WEBHOOK_URL": bool(os.getenv("AMOCRM_WEBHOOK_URL")),
+        "YANDEX_DIRECT_TOKEN": bool(os.getenv("YANDEX_DIRECT_TOKEN")),
+        "VK_ADS_TOKEN": bool(os.getenv("VK_ADS_TOKEN")),
         "USE_MOCKS": os.getenv("USE_MOCKS", "not set"),
         "LLM_PROVIDER": os.getenv("LLM_PROVIDER", "not set"),
         "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
