@@ -9,7 +9,10 @@ from app.mock_services import (
     mock_get_campaign_cpl,
 )
 from app.bitrix_client import Bitrix24Client
+from app.amocrm_client import AmoCRMClient
 from app.ad_clients import get_ad_client
+
+CRM_SOURCE = os.getenv("CRM_SOURCE", "bitrix24")
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -81,9 +84,12 @@ async def analyze_single_lead(lead_id: str, campaign_name: str) -> dict:
             manager_actions = await mock_get_manager_actions(lead_id)
             cpl = await mock_get_campaign_cpl(campaign_name)
         else:
-            bitrix = Bitrix24Client()
-            crm_meta = await bitrix.get_crm_meta(lead_id)
-            manager_actions = await bitrix.get_manager_actions(lead_id)
+            if CRM_SOURCE == "amocrm":
+                crm = AmoCRMClient()
+            else:
+                crm = Bitrix24Client()
+            crm_meta = await crm.get_crm_meta(lead_id)
+            manager_actions = await crm.get_manager_actions(lead_id)
             ad_client = get_ad_client(campaign_name)
             cpl = await ad_client.get_campaign_cpl(campaign_name)
 
