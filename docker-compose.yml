@@ -1,11 +1,20 @@
 version: "3.9"
 
 services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   lead-analytics:
     build: .
+    depends_on:
+      - redis
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
       - PORT=8000
+      - REDIS_URL=redis://redis:6379/0

@@ -75,6 +75,24 @@ class AmoCRMClient:
             "created_at": str(data.get("created_at", "")),
         }
 
+    async def search_leads_by_campaign(self, campaign_name: str) -> List[str]:
+        if not self.token:
+            return []
+        clean_name = campaign_name.strip("*")
+        url = f"{self.base_url}/leads"
+        data = await self._rate_limited_request(
+            "GET", url,
+            params={"filter[name]": clean_name, "limit": 50},
+        )
+        leads = data.get("_embedded", {}).get("leads", [])
+        if not leads:
+            data = await self._rate_limited_request(
+                "GET", url,
+                params={"limit": 50, "order[updated_at]": "DESC"},
+            )
+            leads = data.get("_embedded", {}).get("leads", [])
+        return [str(lead["id"]) for lead in leads if "id" in lead]
+
     async def get_manager_actions(self, lead_id: str) -> List[str]:
         if not self.token:
             return []

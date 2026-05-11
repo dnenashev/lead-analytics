@@ -13,6 +13,7 @@ from app.models import (
 )
 from app.middleware import APIKeyMiddleware
 from app.analysis import analyze_cohort, _task_store
+from app.redis_store import set_task, get_task
 from app.logging_config import setup_logging
 
 logger = setup_logging()
@@ -49,6 +50,7 @@ async def health():
 @app.post("/api/analyze", response_model=AnalyzeResponse, status_code=202)
 async def start_analysis(req: AnalyzeRequest, background_tasks: BackgroundTasks):
     task_id = generate_task_id()
+    await set_task(task_id, {"status": "processing", "progress": "0/0 leads", "results": None})
     _task_store[task_id] = {"status": "processing", "progress": "0/0 leads", "results": None}
 
     background_tasks.add_task(
@@ -72,7 +74,7 @@ async def start_analysis(req: AnalyzeRequest, background_tasks: BackgroundTasks)
 
 @app.get("/api/analyze/{task_id}", response_model=TaskStatusResponse)
 async def get_analysis_status(task_id: str):
-    task = _task_store.get(task_id)
+    task = await get_task(task_id) or _task_store.get(task_id)
     if not task:
         return JSONResponse(status_code=404, content={"detail": "Task not found"})
     return {

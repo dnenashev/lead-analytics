@@ -11,6 +11,8 @@ from app.mock_services import (
 from app.bitrix_client import Bitrix24Client
 from app.amocrm_client import AmoCRMClient
 from app.ad_clients import get_ad_client
+from app.paperclip_llm_client import PaperclipLLMAdapter
+from app.redis_store import set_task
 
 USE_DUAL_CRM = os.getenv("USE_DUAL_CRM", "true").lower() == "true"
 
@@ -32,6 +34,10 @@ _task_store: dict = {}
 
 
 async def _call_llm(system_prompt: str, user_data: dict) -> dict:
+    if LLM_PROVIDER == "paperclip":
+        adapter = PaperclipLLMAdapter(PAPERCLIP_API_URL, PAPERCLIP_API_KEY)
+        return await adapter.analyze_lead(system_prompt, user_data)
+
     if LLM_PROVIDER == "mock" or not (GEMINI_API_KEY or DEEPSEEK_API_KEY):
         return {
             "lead_id": user_data.get("lead_id", ""),
@@ -162,6 +168,38 @@ async def post_paperclip_comment(issue_id: str, text: str):
         pass
 
 
+async def search_leads_by_campaign(campaign_names: List[str], sample_size: int) -> dict:
+    if USE_MOCKS:
+        result = {}
+        for campaign in campaign_names:
+            result[campaign] = [f"lead_{campaign.strip('*')}_{i+1}" for i in range(sample_size)]
+        return result
+
+    result = {}
+    for campaign in campaign_names:
+        lead_ids = []
+        try:
+            if USE_DUAL_CRM:
+                bitrix = Bitrix24Client()
+                amocrm = AmoCRMClient()
+                b_ids, a_ids = await asyncio.gather(
+                    bitrix.search_leads_by_campaign(campaign),
+                    amocrm.search_leads_by_campaign(campaign),
+                    return_exceptions=True,
+                )
+                if not isinstance(b_ids, Exception):
+                    lead_ids.extend(b_ids)
+                if not isinstance(a_ids, Exception):
+                    lead_ids.extend(a_ids)
+            else:
+                bitrix = Bitrix24Client()
+                lead_ids = await bitrix.search_leads_by_campaign(campaign)
+        except Exception:
+            lead_ids = [f"lead_{campaign.strip('*')}_{i+1}" for i in range(sample_size)]
+        result[campaign] = lead_ids[:sample_size]
+    return result
+
+
 async def analyze_cohort(campaign_names: List[str], sample_size: int, issue_id: Optional[str] = None, task_id: str = ""):
     import logging
     logger = logging.getLogger(__name__)
@@ -169,9 +207,11 @@ async def analyze_cohort(campaign_names: List[str], sample_size: int, issue_id: 
     total = sample_size * len(campaign_names)
     processed = 0
 
+    leads_by_campaign = await search_leads_by_campaign(campaign_names, sample_size)
+
     for campaign in campaign_names:
-        for i in range(sample_size):
-            lead_id = f"lead_{campaign.strip('*')}_{i+1}"
+        lead_ids = leads_by_campaign.get(campaign, [])
+        for lead_id in lead_ids:
             result = await analyze_single_lead(lead_id, campaign)
             result["campaign"] = campaign
             results.append(result)
@@ -180,14 +220,16 @@ async def analyze_cohort(campaign_names: List[str], sample_size: int, issue_id: 
             if processed % 5 == 0 and issue_id:
                 await post_paperclip_comment(
                     issue_id,
-                    f"🔄 Progress: {processed}/{total} leads analyzed ({campaign})",
+                    f"Progress: {processed}/{total} leads analyzed ({campaign})",
                 )
 
-    _task_store[task_id] = {
+    completed = {
         "status": "completed",
         "progress": f"{total}/{total} leads analyzed",
         "results": results,
     }
+    _task_store[task_id] = completed
+    await set_task(task_id, completed)
 
     if issue_id and results:
         traffic_issues = sum(1 for r in results if r.get("is_traffic_issue"))

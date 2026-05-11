@@ -46,6 +46,29 @@ class Bitrix24Client:
             "created_at": lead.get("DATE_CREATE", ""),
         }
 
+    async def search_leads_by_campaign(self, campaign_name: str) -> List[str]:
+        if not self.webhook_url:
+            return []
+        clean_name = campaign_name.strip("*")
+        result = await self._rate_limited_request(
+            "crm.lead.list",
+            {
+                "filter": {"TITLE": f"%{clean_name}%"},
+                "select": ["ID", "TITLE"],
+            },
+        )
+        leads = result.get("result", [])
+        if not leads:
+            result = await self._rate_limited_request(
+                "crm.lead.list",
+                {
+                    "order": {"ID": "DESC"},
+                    "select": ["ID"],
+                },
+            )
+            leads = result.get("result", [])
+        return [lead["ID"] for lead in leads if "ID" in lead]
+
     async def get_manager_actions(self, lead_id: str) -> List[str]:
         if not self.webhook_url:
             return []
