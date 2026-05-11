@@ -37,8 +37,11 @@ class PaperclipLLMAdapter:
             "cpl": cpl,
             "manager_actions": manager_actions,
             "diagnosis": (
-                "Paperclip LLM adapter: no LLM configured. "
-                "Set GEMINI_API_KEY or DEEPSEEK_API_KEY env var on Railway, "
+                "Paperclip LLM adapter: no API key configured. "
+                "Paperclip's DeepSeek v4 Flash is not accessible via sync API — "
+                "it runs through the opencode adapter as agent subprocesses. "
+                "Set GEMINI_API_KEY env var on Railway for real LLM analysis via Gemini. "
+                "Or deploy lead-analytics-bot to process diagnostic issues asynchronously."
             ),
             "is_traffic_issue": False,
             "is_sales_issue": False,
