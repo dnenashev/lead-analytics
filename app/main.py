@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
         "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
         "DEEPSEEK_API_KEY": bool(os.getenv("DEEPSEEK_API_KEY")),
     }
-    logger.info("Startup env check", extra={"env_vars": env_vars})
+    logger.info("Startup env check: %s", env_vars)
 
     yield
     logger.info("lead-analytics service shutting down")
