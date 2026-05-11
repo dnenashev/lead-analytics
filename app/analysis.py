@@ -12,7 +12,7 @@ from app.bitrix_client import Bitrix24Client
 from app.amocrm_client import AmoCRMClient
 from app.ad_clients import get_ad_client
 
-CRM_SOURCE = os.getenv("CRM_SOURCE", "bitrix24")
+USE_DUAL_CRM = os.getenv("USE_DUAL_CRM", "true").lower() == "true"
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "mock")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
@@ -84,12 +84,27 @@ async def analyze_single_lead(lead_id: str, campaign_name: str) -> dict:
             manager_actions = await mock_get_manager_actions(lead_id)
             cpl = await mock_get_campaign_cpl(campaign_name)
         else:
-            if CRM_SOURCE == "amocrm":
-                crm = AmoCRMClient()
+            crm_meta = {"id": lead_id, "crm_status": "unknown", "source": "unknown"}
+            manager_actions = []
+            if USE_DUAL_CRM:
+                bitrix = Bitrix24Client()
+                amocrm = AmoCRMClient()
+                b_meta, b_actions, a_meta, a_actions = await asyncio.gather(
+                    bitrix.get_crm_meta(lead_id), bitrix.get_manager_actions(lead_id),
+                    amocrm.get_crm_meta(lead_id), amocrm.get_manager_actions(lead_id),
+                    return_exceptions=True,
+                )
+                if not isinstance(b_meta, Exception) and b_meta.get("crm_status") != "mock":
+                    crm_meta = b_meta
+                    manager_actions = b_actions if not isinstance(b_actions, Exception) else []
+                if not isinstance(a_meta, Exception) and a_meta.get("crm_status") != "mock":
+                    crm_meta = a_meta
+                    if isinstance(a_actions, list) and a_actions:
+                        manager_actions = a_actions
             else:
                 crm = Bitrix24Client()
-            crm_meta = await crm.get_crm_meta(lead_id)
-            manager_actions = await crm.get_manager_actions(lead_id)
+                crm_meta = await crm.get_crm_meta(lead_id)
+                manager_actions = await crm.get_manager_actions(lead_id)
             ad_client = get_ad_client(campaign_name)
             cpl = await ad_client.get_campaign_cpl(campaign_name)
 

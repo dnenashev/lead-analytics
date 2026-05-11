@@ -1,5 +1,6 @@
 import os
-from typing import Optional
+import json
+from typing import Optional, List
 from abc import ABC, abstractmethod
 import httpx
 
@@ -7,6 +8,7 @@ YANDEX_DIRECT_TOKEN = os.getenv("YANDEX_DIRECT_TOKEN", "")
 YANDEX_DIRECT_LOGIN = os.getenv("YANDEX_DIRECT_LOGIN", "")
 VK_ADS_TOKEN = os.getenv("VK_ADS_TOKEN", "")
 VK_ADS_ACCOUNT_ID = os.getenv("VK_ADS_ACCOUNT_ID", "")
+VK_ADS_ACCOUNTS_JSON = os.getenv("VK_ADS_ACCOUNTS", "[]")
 
 
 class AdPlatformClient(ABC):
@@ -55,13 +57,32 @@ class VKAdsClient(AdPlatformClient):
         self.account_id = account_id or VK_ADS_ACCOUNT_ID
 
     async def get_campaign_cpl(self, campaign_name: str) -> Optional[float]:
-        if not self.token:
+        accounts = self._get_all_accounts()
+        for acc in accounts:
+            cpl = await self._query_single_account(campaign_name, acc["token"], acc["account_id"])
+            if cpl is not None:
+                return cpl
+        if self.token:
+            return await self._query_single_account(campaign_name, self.token, self.account_id)
+        return None
+
+    def _get_all_accounts(self) -> List[dict]:
+        try:
+            accounts = json.loads(VK_ADS_ACCOUNTS_JSON)
+            if isinstance(accounts, list):
+                return accounts
+        except Exception:
+            pass
+        return []
+
+    async def _query_single_account(self, campaign_name: str, token: str, account_id: str) -> Optional[float]:
+        if not token or not account_id:
             return None
         url = "https://api.vk.com/method/ads.getCampaigns"
         params = {
-            "access_token": self.token,
+            "access_token": token,
             "v": "5.131",
-            "account_id": self.account_id,
+            "account_id": account_id,
         }
         try:
             async with httpx.AsyncClient(timeout=30) as client:
