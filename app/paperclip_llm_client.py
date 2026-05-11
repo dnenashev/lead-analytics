@@ -13,8 +13,16 @@ AGENT_ID = os.getenv("LEAD_ANALYTICS_BOT_ID", "")
 
 class PaperclipLLMAdapter:
     def __init__(self, api_url: str | None = None, api_key: str | None = None):
-        self.api_url = (api_url or os.getenv("PAPERCLIP_API_URL", "")).rstrip("/")
-        self.api_key = api_key or os.getenv("PAPERCLIP_API_KEY", "")
+        self.api_url = (
+            api_url
+            or os.getenv("PAPERCLIP_API_URL", "")
+            or os.getenv("PAPERCLIP_SERVICE_URL", "")
+        ).rstrip("/")
+        self.api_key = (
+            api_key
+            or os.getenv("PAPERCLIP_API_KEY", "")
+            or os.getenv("PAPERCLIP_SERVICE_TOKEN", "")
+        )
 
     async def analyze_lead(self, system_prompt: str, user_data: dict) -> dict:
         lead_id = user_data.get("lead_id", "unknown")
