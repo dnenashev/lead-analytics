@@ -16,6 +16,12 @@ from app.analysis import analyze_cohort, _task_store
 from app.redis_store import set_task, get_task
 from app.logging_config import setup_logging
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 logger = setup_logging()
 
 
