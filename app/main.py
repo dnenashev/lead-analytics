@@ -22,6 +22,21 @@ logger = setup_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("lead-analytics service starting")
+
+    env_vars = {
+        "API_KEY": bool(os.getenv("API_KEY")),
+        "PAPERCLIP_API_URL": bool(os.getenv("PAPERCLIP_API_URL")),
+        "PAPERCLIP_API_KEY": bool(os.getenv("PAPERCLIP_API_KEY")),
+        "PAPERCLIP_SERVICE_TOKEN": bool(os.getenv("PAPERCLIP_SERVICE_TOKEN")),
+        "BITRIX24_WEBHOOK_URL": bool(os.getenv("BITRIX24_WEBHOOK_URL")),
+        "AMOCRM_WEBHOOK_URL": bool(os.getenv("AMOCRM_WEBHOOK_URL")),
+        "USE_MOCKS": os.getenv("USE_MOCKS", "not set"),
+        "LLM_PROVIDER": os.getenv("LLM_PROVIDER", "not set"),
+        "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
+        "DEEPSEEK_API_KEY": bool(os.getenv("DEEPSEEK_API_KEY")),
+    }
+    logger.info("Startup env check", extra={"env_vars": env_vars})
+
     yield
     logger.info("lead-analytics service shutting down")
 
