@@ -50,7 +50,34 @@ class PaperclipLLMAdapter:
             logger.warning("Paperclip API diagnosis failed for lead %s: %s", lead_id, e)
             return self._fallback(user_data, f"Paperclip API error: {e}")
 
+    async def _find_existing_diagnosis_issue(self, lead_id: str) -> dict | None:
+        title = f"LLM Diagnosis: lead {lead_id}"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(
+                f"{self.api_url}/api/companies/{COMPANY_ID}/issues",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                params={"title": title, "status": "in_progress"},
+            )
+            if resp.status_code >= 400:
+                logger.warning("Failed to check existing issues: HTTP %s", resp.status_code)
+                return None
+            data = resp.json()
+            issues = data if isinstance(data, list) else data.get("issues", data.get("data", []))
+            for issue in issues:
+                if issue.get("title") == title and issue.get("status") in ("in_progress", "todo", "backlog"):
+                    existing_id = issue.get("identifier") or issue.get("id", "unknown")
+                    logger.info("Found existing diagnosis issue %s for lead %s", existing_id, lead_id)
+                    return existing_id
+            return None
+
     async def _create_diagnosis_issue(self, lead_id: str, cpl: float, crm_status: str, manager_actions: list, source: str, system_prompt: str) -> dict:
+        existing = await self._find_existing_diagnosis_issue(lead_id)
+        if existing:
+            return {"diagnosis": f"Diagnosis already requested in Paperclip issue {existing}", "is_traffic_issue": False, "is_sales_issue": False}
+
         issue_data = {
             "title": f"LLM Diagnosis: lead {lead_id}",
             "description": (
